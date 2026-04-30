@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 
 const supabase = createClient();
 
-async function handleResponse(req: Promise<any>) {
+async function handleResponse(req: PromiseLike<any>) {
   const { data, error } = await req;
   if (error) throw new Error(error.message);
   return { data };
