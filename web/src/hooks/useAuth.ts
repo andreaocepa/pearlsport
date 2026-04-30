@@ -1,6 +1,6 @@
 import { create } from 'zustand';
+import { createClient } from '@/utils/supabase/client';
 import { User } from '@/types';
-import { authApi, setAccessToken } from '@/lib/api';
 
 interface AuthState {
   user: User | null;
@@ -18,34 +18,84 @@ export const useAuth = create<AuthState>((set) => ({
 
   login: async (email, password) => {
     set({ isLoading: true });
-    try {
-      const { data } = await authApi.login(email, password);
-      setAccessToken(data.accessToken);
-      set({ user: data.user, isAuthenticated: true, isLoading: false });
-    } catch (error: any) {
+    const supabase = createClient();
+    
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
       set({ user: null, isAuthenticated: false, isLoading: false });
-      throw new Error(error.response?.data?.error || 'Login failed');
+      throw new Error(authError.message);
     }
+
+    if (authData.user) {
+      // Fetch profile data
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profile) {
+        set({
+          user: {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            avatarUrl: profile.avatar_url,
+          } as User,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return;
+      }
+    }
+    
+    set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
   logout: async () => {
-    try {
-      await authApi.logout();
-    } finally {
-      setAccessToken(null);
-      set({ user: null, isAuthenticated: false });
-    }
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    set({ user: null, isAuthenticated: false });
   },
 
   checkAuth: async () => {
     set({ isLoading: true });
+    const supabase = createClient();
     try {
-      // The api interceptor will automatically try to refresh the token 
-      // if we get a 401 on this request
-      const { data } = await authApi.me();
-      set({ user: data, isAuthenticated: true, isLoading: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        set({ user: null, isAuthenticated: false, isLoading: false });
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        set({
+          user: {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            avatarUrl: profile.avatar_url,
+          } as User,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } else {
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      }
     } catch (error) {
-      setAccessToken(null);
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },

@@ -1,110 +1,108 @@
-import axios from 'axios';
+import { createClient } from '@/utils/supabase/client';
+import { v4 as uuid } from 'uuid';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const supabase = createClient();
 
-export const api = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-});
-
-// Attach access token from memory on every request
-let accessToken: string | null = null;
-
-export function setAccessToken(token: string | null) {
-  accessToken = token;
+async function handleResponse(req: Promise<any>) {
+  const { data, error } = await req;
+  if (error) throw new Error(error.message);
+  return { data };
 }
 
-api.interceptors.request.use((config) => {
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  return config;
-});
-
-// Auto-refresh on 401
-api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true;
-      try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-        setAccessToken(data.accessToken);
-        original.headers.Authorization = `Bearer ${data.accessToken}`;
-        return api(original);
-      } catch {
-        setAccessToken(null);
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-// ── API helpers ───────────────────────────────────────────────────────────────
-
 export const articlesApi = {
-  list: (params?: Record<string, string | number>) => api.get('/articles', { params }),
-  featured: () => api.get('/articles/featured'),
-  bySlug: (slug: string) => api.get(`/articles/${slug}`),
-  create: (data: unknown) => api.post('/articles', data),
-  update: (id: string, data: unknown) => api.put(`/articles/${id}`, data),
-  submit: (id: string) => api.patch(`/articles/${id}/submit`),
-  publish: (id: string) => api.patch(`/articles/${id}/publish`),
-  feature: (id: string) => api.patch(`/articles/${id}/feature`),
-  delete: (id: string) => api.delete(`/articles/${id}`),
+  list: async (params?: Record<string, string | number>) => {
+    let query = supabase.from('articles').select('*, author:profiles(*), sport:sports(*), tags(*)').eq('status', 'PUBLISHED').order('published_at', { ascending: false });
+    if (params?.sport) query = query.eq('sport.slug', params.sport);
+    if (params?.tag) query = query.eq('tags.slug', params.tag);
+    if (params?.limit) query = query.limit(Number(params.limit));
+    return handleResponse(query);
+  },
+  featured: () => handleResponse(supabase.from('articles').select('*, author:profiles(*), sport:sports(*), tags(*)').eq('status', 'PUBLISHED').eq('is_featured', true).order('published_at', { ascending: false }).limit(1).single()),
+  bySlug: (slug: string) => handleResponse(supabase.from('articles').select('*, author:profiles(*), sport:sports(*), tags(*), fixture:fixtures(*)').eq('slug', slug).single()),
+  create: (data: any) => handleResponse(supabase.from('articles').insert([data]).select().single()),
+  update: (id: string, data: any) => handleResponse(supabase.from('articles').update(data).eq('id', id).select().single()),
+  submit: (id: string) => handleResponse(supabase.from('articles').update({ status: 'REVIEW' }).eq('id', id)),
+  publish: (id: string) => handleResponse(supabase.from('articles').update({ status: 'PUBLISHED', published_at: new Date().toISOString() }).eq('id', id)),
+  feature: (id: string, isFeatured: boolean) => handleResponse(supabase.from('articles').update({ is_featured: isFeatured }).eq('id', id)),
+  delete: (id: string) => handleResponse(supabase.from('articles').delete().eq('id', id)),
 };
 
 export const fixturesApi = {
-  list: (params?: Record<string, string>) => api.get('/fixtures', { params }),
-  results: (params?: Record<string, string>) => api.get('/fixtures/results', { params }),
-  byId: (id: string) => api.get(`/fixtures/${id}`),
-  create: (data: unknown) => api.post('/fixtures', data),
-  update: (id: string, data: unknown) => api.put(`/fixtures/${id}`, data),
-  delete: (id: string) => api.delete(`/fixtures/${id}`),
+  list: (params?: any) => {
+    let q = supabase.from('fixtures').select('*, homeTeam:teams!home_team_id(*), awayTeam:teams!away_team_id(*), competition:competitions(*)');
+    if (params?.sport) q = q.eq('sport.slug', params.sport);
+    return handleResponse(q);
+  },
+  results: (params?: any) => handleResponse(supabase.from('fixtures').select('*, homeTeam:teams!home_team_id(*), awayTeam:teams!away_team_id(*), competition:competitions(*)').eq('status', 'COMPLETED')),
+  byId: (id: string) => handleResponse(supabase.from('fixtures').select('*, homeTeam:teams!home_team_id(*), awayTeam:teams!away_team_id(*)').eq('id', id).single()),
+  create: (data: any) => handleResponse(supabase.from('fixtures').insert([data])),
+  update: (id: string, data: any) => handleResponse(supabase.from('fixtures').update(data).eq('id', id)),
+  delete: (id: string) => handleResponse(supabase.from('fixtures').delete().eq('id', id)),
 };
 
 export const sportsApi = {
-  list: () => api.get('/sports'),
+  list: () => handleResponse(supabase.from('sports').select('*').order('order', { ascending: true })),
 };
 
 export const teamsApi = {
-  list: (sport?: string) => api.get('/teams', { params: sport ? { sport } : {} }),
-  bySlug: (slug: string) => api.get(`/teams/${slug}`),
-  create: (data: unknown) => api.post('/teams', data),
-  update: (id: string, data: unknown) => api.put(`/teams/${id}`, data),
+  list: (sport?: string) => {
+    let q = supabase.from('teams').select('*');
+    if (sport) q = q.eq('sport.slug', sport);
+    return handleResponse(q);
+  },
+  bySlug: (slug: string) => handleResponse(supabase.from('teams').select('*').eq('slug', slug).single()),
+  create: (data: any) => handleResponse(supabase.from('teams').insert([data])),
+  update: (id: string, data: any) => handleResponse(supabase.from('teams').update(data).eq('id', id)),
 };
 
 export const competitionsApi = {
-  list: (params?: Record<string, string>) => api.get('/competitions', { params }),
-  create: (data: unknown) => api.post('/competitions', data),
-  update: (id: string, data: unknown) => api.put(`/competitions/${id}`, data),
+  list: (params?: Record<string, string>) => handleResponse(supabase.from('competitions').select('*')),
+  create: (data: any) => handleResponse(supabase.from('competitions').insert([data])),
+  update: (id: string, data: any) => handleResponse(supabase.from('competitions').update(data).eq('id', id)),
 };
 
 export const mediaApi = {
-  upload: (formData: FormData) =>
-    api.post('/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  list: () => api.get('/media'),
-  delete: (storagePath: string) =>
-    api.delete(`/media/${Buffer.from(storagePath).toString('base64')}`),
+  upload: async (formData: FormData) => {
+    const file = formData.get('image') as File;
+    if (!file) throw new Error('No image provided');
+    const id = uuid();
+    const storagePath = `uploads/${id}/${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('media').upload(storagePath, file);
+    if (uploadError) throw new Error(uploadError.message);
+    const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(storagePath);
+    
+    // Save metadata
+    const { data: mediaRecord, error: dbError } = await supabase.from('media').insert([{
+      url: publicUrlData.publicUrl,
+      storage_path: storagePath,
+      size_bytes: file.size,
+    }]).select().single();
+    if (dbError) throw new Error(dbError.message);
+    
+    return { data: { url: publicUrlData.publicUrl, storagePath } };
+  },
+  list: () => handleResponse(supabase.from('media').select('*').order('created_at', { ascending: false })),
+  delete: async (storagePath: string) => {
+    await supabase.storage.from('media').remove([storagePath]);
+    return handleResponse(supabase.from('media').delete().eq('storage_path', storagePath));
+  },
 };
 
 export const searchApi = {
-  search: (q: string, sport?: string, page?: number) =>
-    api.get('/search', { params: { q, sport, page } }),
+  search: (q: string, sport?: string, page?: number) => {
+    let query = supabase.from('articles').select('*, author:profiles(*)').textSearch('title_body', q);
+    return handleResponse(query);
+  },
 };
 
 export const authApi = {
-  login: (email: string, password: string) => api.post('/auth/login', { email, password }),
-  refresh: () => api.post('/auth/refresh'),
-  logout: () => api.post('/auth/logout'),
-  me: () => api.get('/users/me'),
+  // Auth logic is now handled directly in useAuth hook using Supabase client
 };
 
 export const usersApi = {
-  list: () => api.get('/users'),
-  create: (data: unknown) => api.post('/users', data),
-  update: (id: string, data: unknown) => api.put(`/users/${id}`, data),
-  setRole: (id: string, role: string) => api.patch(`/users/${id}/role`, { role }),
-  deactivate: (id: string) => api.patch(`/users/${id}/deactivate`),
+  list: () => handleResponse(supabase.from('profiles').select('*')),
+  create: (data: any) => handleResponse(supabase.from('profiles').insert([data])),
+  update: (id: string, data: any) => handleResponse(supabase.from('profiles').update(data).eq('id', id)),
+  setRole: (id: string, role: string) => handleResponse(supabase.from('profiles').update({ role }).eq('id', id)),
+  deactivate: (id: string) => handleResponse(supabase.from('profiles').update({ is_active: false }).eq('id', id)),
 };
