@@ -30,8 +30,8 @@ const mockArticle: Article = {
   publishedAt: new Date().toISOString(),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  author: { id: 'a1', name: 'John Doe', isActive: true, email: '', role: 'WRITER', createdAt: '' },
-  sport: { id: 's1', name: 'Football', slug: 'football', isMain: true, order: 1 },
+  author: { id: 'a1', name: 'John Doe' },
+  sport: { id: 's1', name: 'Football', slug: 'football' },
   tags: [{ id: 'tag1', name: 'Lango Super League', slug: 'lango-super-league' }, { id: 'tag2', name: 'Match Report', slug: 'match-report' }],
 };
 

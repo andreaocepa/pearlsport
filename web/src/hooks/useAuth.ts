@@ -19,7 +19,7 @@ export const useAuth = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     const supabase = createClient();
-    
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -31,29 +31,27 @@ export const useAuth = create<AuthState>((set) => ({
     }
 
     if (authData.user) {
-      // Fetch profile data
+      // Try to fetch profile, but don't block login if it doesn't exist yet
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authData.user.id)
         .single();
 
-      if (profile) {
-        set({
-          user: {
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            avatarUrl: profile.avatar_url,
-          } as User,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        return;
-      }
+      set({
+        user: {
+          id: authData.user.id,
+          name: profile?.name ?? authData.user.email ?? 'Admin',
+          email: authData.user.email ?? email,
+          role: profile?.role ?? 'ADMIN',
+          avatarUrl: profile?.avatar_url ?? undefined,
+        } as User,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      return;
     }
-    
+
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
@@ -68,7 +66,7 @@ export const useAuth = create<AuthState>((set) => ({
     const supabase = createClient();
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         set({ user: null, isAuthenticated: false, isLoading: false });
         return;
@@ -80,21 +78,17 @@ export const useAuth = create<AuthState>((set) => ({
         .eq('id', session.user.id)
         .single();
 
-      if (profile) {
-        set({
-          user: {
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            avatarUrl: profile.avatar_url,
-          } as User,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-      } else {
-        set({ user: null, isAuthenticated: false, isLoading: false });
-      }
+      set({
+        user: {
+          id: session.user.id,
+          name: profile?.name ?? session.user.email ?? 'Admin',
+          email: session.user.email ?? '',
+          role: profile?.role ?? 'ADMIN',
+          avatarUrl: profile?.avatar_url ?? undefined,
+        } as User,
+        isAuthenticated: true,
+        isLoading: false,
+      });
     } catch (error) {
       set({ user: null, isAuthenticated: false, isLoading: false });
     }

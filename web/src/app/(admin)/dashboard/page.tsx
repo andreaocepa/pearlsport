@@ -69,7 +69,7 @@ export default function DashboardPage() {
             <Link href="/dashboard/articles/new" className="btn-primary w-full justify-center py-3">
               Write New Article
             </Link>
-            <Link href="/dashboard/fixtures/new" className="btn-outline w-full justify-center py-3 bg-white">
+            <Link href="/dashboard/fixtures" className="btn-outline w-full justify-center py-3 bg-white">
               Add Fixture
             </Link>
             <Link href="/dashboard/media" className="btn-outline w-full justify-center py-3 bg-white">

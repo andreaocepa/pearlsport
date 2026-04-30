@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-form-hook';
-// Using standard state since react-hook-form wasn't explicitly needed for this simple form, 
-// though it is in package.json. I'll use standard state to keep it simple.
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
@@ -11,8 +9,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +20,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to login');
       setIsLoading(false);

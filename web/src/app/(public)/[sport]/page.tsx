@@ -1,8 +1,12 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import ArticleCard from '@/components/article/ArticleCard';
 import FixtureWeekWidget from '@/components/fixtures/FixtureWeekWidget';
 import HeroCard from '@/components/article/HeroCard';
 import { Article, Fixture } from '@/types';
+
+// Valid sports list
+const VALID_SPORTS = ['football', 'athletics', 'basketball', 'boxing', 'rugby'];
 
 // Mock Data
 const mockHeroArticle: Article = {
@@ -16,8 +20,8 @@ const mockHeroArticle: Article = {
   publishedAt: new Date().toISOString(),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  author: { id: 'a1', name: 'John Doe', isActive: true, email: '', role: 'WRITER', createdAt: '' },
-  sport: { id: 's1', name: 'Football', slug: 'football', isMain: true, order: 1 },
+  author: { id: 'a1', name: 'John Doe' },
+  sport: { id: 's1', name: 'Football', slug: 'football' },
   tags: [],
 };
 
@@ -41,8 +45,14 @@ const mockFixtures: Fixture[] = [
   },
 ];
 
-export default function SportPage({ params }: { params: { sport: string } }) {
-  const sportName = params.sport.charAt(0).toUpperCase() + params.sport.slice(1);
+export default async function SportPage({ params }: { params: Promise<{ sport: string }> }) {
+  const { sport } = await params;
+
+  if (!VALID_SPORTS.includes(sport.toLowerCase())) {
+    notFound();
+  }
+
+  const sportName = sport.charAt(0).toUpperCase() + sport.slice(1);
 
   return (
     <div className="w-full">
@@ -67,10 +77,10 @@ export default function SportPage({ params }: { params: { sport: string } }) {
             <button className="py-4 text-pearl-red border-b-2 border-pearl-red nav-active">
               News
             </button>
-            <Link href={`/fixtures?sport=${params.sport}`} className="py-4 text-muted-text hover:text-dark-text transition-colors">
+            <Link href={`/fixtures?sport=${sport}`} className="py-4 text-muted-text hover:text-dark-text transition-colors">
               Fixtures
             </Link>
-            <Link href={`/results?sport=${params.sport}`} className="py-4 text-muted-text hover:text-dark-text transition-colors">
+            <Link href={`/results?sport=${sport}`} className="py-4 text-muted-text hover:text-dark-text transition-colors">
               Results
             </Link>
           </nav>
