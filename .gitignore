@@ -6,3 +6,7 @@ dist
 build
 .next
 .DS_Store
+
+# Root-level package files — dependencies belong in web/
+/package.json
+/package-lock.json
